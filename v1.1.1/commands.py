@@ -6,7 +6,7 @@ GUI's `command_history` list. This structure enables Undo/Redo functionality in 
 """
 
 import numpy as np
-
+from PyQt6.QtGui import QTextCursor
 
 class Command:
     """Base class for Commands"""
@@ -84,7 +84,7 @@ class LoadSpectrumCommand(Command):
 
         # Aesthetics
         self.app.plot1_log.clear()
-        self.app.button_baseline.setText('Estimate Baseline')
+        self.app.button_baseline.setText('基线估计')
 
         self.app.spectrum = self.new_spectrum
         if self.app.spectrum is not None:
@@ -94,11 +94,20 @@ class LoadSpectrumCommand(Command):
 
         # Communicate
         self.app.plot1_log.addItem(f"Loaded file: {str(self.app.unknown_spectrum_path)}")
+        # 选中最后一个项目并滚动到该项目
+        self.app.plot1_log.setCurrentRow(self.app.plot1_log.count() - 1)
+        self.app.plot1_log.scrollToItem(self.app.plot1_log.currentItem())
+        self.app.plot1_log.clearSelection()
 
     def undo(self):
         if self.old_plot1_log:
             self.app.plot1_log.clear()
             self.app.plot1_log.addItems(self.old_plot1_log)
+            # 选中最后一个项目并滚动到该项目
+            self.app.plot1_log.setCurrentRow(self.app.plot1_log.count() - 1)
+            self.app.plot1_log.scrollToItem(self.app.plot1_log.currentItem())
+            self.app.plot1_log.clearSelection()
+
         self.app.spectrum = self.old_spectrum
         if self.app.spectrum is not None:
             self.app.plot1.clear()
@@ -144,8 +153,12 @@ class EstimateBaselineCommand(Command):
     def execute(self):
 
         # Aesthetics
-        self.app.button_baseline.setText('Apply Baseline Correction')
-        self.app.plot1_log.addItem('Baseline estimate calculated') # Communicate
+        self.app.button_baseline.setText('应用基线校正校准')
+        self.app.plot1_log.addItem('基线估计已计算') # Communicate
+        # 选中最后一个项目并滚动到该项目
+        self.app.plot1_log.setCurrentRow(self.app.plot1_log.count() - 1)
+        self.app.plot1_log.scrollToItem(self.app.plot1_log.currentItem())
+        self.app.plot1_log.clearSelection()
 
         # Update data
         self.app.baseline_data = self.new_baseline
@@ -157,7 +170,7 @@ class EstimateBaselineCommand(Command):
         
     def undo(self):
         # Aesthetics
-        self.app.button_baseline.setText('Estimate Baseline') # TODO refactor with a toggle function
+        self.app.button_baseline.setText('基线估计') # TODO refactor with a toggle function
 
         self.app.baseline_data = self.old_baseline
         
@@ -168,7 +181,11 @@ class EstimateBaselineCommand(Command):
         
         if self.app.baseline_data is not None:
             self.app.baseline_plot = self.app.plot1.plot(self.app.spectrum.x, self.app.baseline_data, pen='r')
-        self.app.plot1_log.addItem("Baseline estimate undone")
+        self.app.plot1_log.addItem("基线估计已撤销")
+        # 选中最后一个项目并滚动到该项目
+        self.app.plot1_log.setCurrentRow(self.app.plot1_log.count() - 1)
+        self.app.plot1_log.scrollToItem(self.app.plot1_log.currentItem())
+        self.app.plot1_log.clearSelection()
 
 
 
@@ -193,9 +210,13 @@ class CorrectBaselineCommand(Command):
         
     def execute(self):
         # Aesthetics
-        self.app.button_baseline.setText('Estimate Baseline')
+        self.app.button_baseline.setText('基线估计')
         # Communicate
-        self.app.plot1_log.addItem("Baseline corrected")
+        self.app.plot1_log.addItem("基线已修正")
+        # 选中最后一个项目并滚动到该项目
+        self.app.plot1_log.setCurrentRow(self.app.plot1_log.count() - 1)
+        self.app.plot1_log.scrollToItem(self.app.plot1_log.currentItem())
+        self.app.plot1_log.clearSelection()
         
         self.app.spectrum = self.new_spectrum
         self.app.plot1.clear()
@@ -204,7 +225,7 @@ class CorrectBaselineCommand(Command):
 
     def undo(self):
         # Aesthetics
-        self.app.button_baseline.setText('Apply Baseline Correction')
+        self.app.button_baseline.setText('应用基线校正')
 
         self.app.spectrum = self.old_spectrum
         self.app.baseline_data = self.old_baseline_data # Resture baseline data from before subtraction
@@ -216,7 +237,11 @@ class CorrectBaselineCommand(Command):
         self.app.plot1.autoRange()
 
         # Message
-        self.app.plot1_log.addItem("Baseline restored")
+        self.app.plot1_log.addItem("基线已恢复")
+        # 选中最后一个项目并滚动到该项目
+        self.app.plot1_log.setCurrentRow(self.app.plot1_log.count() - 1)
+        self.app.plot1_log.scrollToItem(self.app.plot1_log.currentItem())
+        self.app.plot1_log.clearSelection()
 
 
 
@@ -245,6 +270,11 @@ class CropCommand(Command):
         self.app.plot1.clear()
         self.app.plot1.plot(*self.app.spectrum)
         self.app.plot1_log.addItem(f'Cropped spectrum from {round(self.crop_start_x)} to {round(self.crop_end_x)} cm^-1')
+        # 选中最后一个项目并滚动到该项目
+        self.app.plot1_log.setCurrentRow(self.app.plot1_log.count() - 1)
+        self.app.plot1_log.scrollToItem(self.app.plot1_log.currentItem())
+        self.app.plot1_log.clearSelection()
+
 
     def undo(self):
         self.app.spectrum = self.old_spectrum

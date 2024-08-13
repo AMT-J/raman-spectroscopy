@@ -1,7 +1,8 @@
 """This file contains new feature messages to communicate updates to the user"""
 
-from PyQt6.QtWidgets import QDialog, QPushButton, QVBoxLayout, QLabel, QHBoxLayout
-from PyQt6.QtGui import QFont
+from PyQt6.QtWidgets import QDialog, QPushButton, QVBoxLayout, QLabel, QHBoxLayout,QStyle
+from PyQt6.QtGui import QGuiApplication,QIcon
+from PyQt6.QtCore import Qt
 
 class WhatsNewDialog(QDialog):
     def __init__(self, messages, parent=None):
@@ -11,28 +12,74 @@ class WhatsNewDialog(QDialog):
         self.current_index = 0
 
         # Configure dialog appearance
-        self.setWindowTitle("What's New")
-        self.setGeometry(200, 200, 600, 200)  # Change size to desired dimensions
+        self.setWindowTitle("键盘快捷键提示")
+        # 获取屏幕分辨率
+        screen = QGuiApplication.primaryScreen().geometry()
+        screen_width = screen.width()
+        screen_height = screen.height()
+        
+        # 计算窗口的宽度和高度为屏幕的1/4
+        window_width = screen_width // 4
+        window_height = screen_height // 4
+        
+        self.setFixedSize(window_width, window_height)
 
+        """将对话框居中显示在屏幕上"""
+        screen = QGuiApplication.primaryScreen().availableGeometry()
+        size = self.geometry()
+        self.move(int((screen.width() - size.width()) / 2),
+                  int((screen.height() - size.height()) / 2))
+        
         # Setup UI components
+
         self.layout = QVBoxLayout(self)
         
+        # 设置左上角的窗口图标
+        icon = self.style().standardIcon(QStyle.StandardPixmap.SP_MessageBoxInformation)
+        self.setWindowIcon(icon)
+
         self.message_label = QLabel(self)
-        self.message_label.setFont(QFont("Arial", 12, QFont.Weight.Light))
+        self.message_label.setStyleSheet("""
+            QLabel {
+                font-family: Trebuchet MS;
+                font-size: 12pt;
+                font-weight: bold;
+            }
+        """)
+        self.message_label.setAlignment(Qt.AlignmentFlag.AlignCenter) 
         self.layout.addWidget(self.message_label)
 
         self.button_layout = QHBoxLayout()
-        
-        self.prev_button = QPushButton("Previous", self)
+        # 定义按钮的基础样式、悬停效果、点击反馈
+        button_style = """
+            QPushButton {
+                background-color: #f0f0f0;
+                border: 1px solid #ccc;
+                border-radius: 5px;
+                padding: 5px 10px;
+            }
+
+            QPushButton:hover {
+                background-color: #e0e0e0;
+            }
+
+            QPushButton:pressed {
+                background-color: #d0d0d0;
+            }
+        """
+        self.prev_button = QPushButton("上一个", self)
         self.prev_button.clicked.connect(self.show_previous_message)
+        self.prev_button.setStyleSheet(button_style)
         self.button_layout.addWidget(self.prev_button)
 
-        self.next_button = QPushButton("Next", self)
+        self.next_button = QPushButton("下一个", self)
         self.next_button.clicked.connect(self.show_next_message)
+        self.next_button.setStyleSheet(button_style)
         self.button_layout.addWidget(self.next_button)
 
-        self.close_button = QPushButton("Close", self)
+        self.close_button = QPushButton("关闭", self)
         self.close_button.clicked.connect(self.accept)
+        self.close_button.setStyleSheet(button_style)
         self.button_layout.addWidget(self.close_button)
 
         self.layout.addLayout(self.button_layout)
@@ -57,19 +104,21 @@ class WhatsNewDialog(QDialog):
 
 new_features = {
     'nt': [
-        'Introducing Undo/Redo functionality! Press Ctrl+Z to Undo a file-load, crop, or baseline edit. Press Ctrl+Shift+Z to Redo.',
-        'Press Ctrl+L to shortcut the Load Spectrum button.',
-        'Press Ctrl+E to quickly estimate the baseline, then press it again to apply the baseline correction.',
-        'Press Ctrl+R to activate Crop mode. Click and drag to select the region to crop out, then press Ctrl+R again to apply the crop.',
-        'Press Ctrl+D to discretize the baseline, once it\'s been estimated. Then click and drag the discrete baseline points to edit the line.',
-        'Once you\'re happy with your data processing, press Ctrl+S to save your spectrum.'
+        'Ctrl+Z：撤销文件加载、裁剪或基线编辑。\nCtrl+Shift+Z：重做操作。',
+        'Ctrl+L：快捷键加载光谱按钮。',
+        'Ctrl+E：快速估算基线,\n然后再次按下以应用基线校正。',
+        'Ctrl+R：激活裁剪模式。\n点击并拖动以选择要裁剪的区域，\n然后再次按下以应用裁剪。',
+        'Ctrl+D：离散化基线，\n然后再点击并拖动离散基线点以编辑线条。',
+        'Ctrl+S：保存光谱。',
+        '注意！\n按下关闭按钮后，后续程序将不会再弹出该窗口'
     ],
     'posix': [
-        'Introducing Undo/Redo functionality! Press Cmd+Z to Undo a file-load, crop, or baseline edit. Press Cmd+Shift+Z to Redo.',
-        'Press Cmd+L to shortcut the Load Spectrum button.',
-        'Press Cmd+E to quickly estimate the baseline, then press it again to apply the baseline correction.',
-        'Press Cmd+R to activate Crop mode. Click and drag to select the region to crop out, then press Cmd+R again to apply the crop.',
-        'Press Cmd+D to discretize the baseline, once it\'s been estimated. Then click and drag the discrete baseline points to edit the line.',
-        'Once you\'re happy with your data processing, press Cmd+S to save your spectrum.'
+        'Ctrl+Z：撤销文件加载、裁剪或基线编辑。\nCtrl+Shift+Z：重做操作。',
+        'Ctrl+L：快捷键加载光谱按钮。',
+        'Ctrl+E：快速估算基线,\n然后再次按下以应用基线校正。',
+        'Ctrl+R：激活裁剪模式。\n点击并拖动以选择要裁剪的区域，\n然后再次按下以应用裁剪。',
+        'Ctrl+D：离散化基线，\n然后再点击并拖动离散基线点以编辑线条。',
+        'Ctrl+S：保存光谱。',
+        '注意！\n按下关闭按钮后，后续程序将不会再弹出该窗口'
     ]
 }
