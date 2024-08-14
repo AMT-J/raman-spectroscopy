@@ -29,6 +29,10 @@ from commands import CropCommand
 class MainApp(QMainWindow):
     def __init__(self):
         super().__init__()
+        #初始化
+        self.peaks_x = np.array([])  
+        self.peaks_y = np.array([])  
+        self.peak_texts=[]
         self.title = 'Raman Spectra Analyzer'
         self.database_path = None
         self.baseline_data = None
@@ -44,6 +48,414 @@ class MainApp(QMainWindow):
         self.init_keyboard_shortcuts()
 
         self.command_history = CommandHistory()
+
+    def init_UI(self):
+        """Initialization method for the User Interface
+        main_layout
+          |--search_layout
+          |    |--database_layout
+          |    |--peaks_layout
+          |    |--tolerance_layout
+          |--results_layout
+          |--plot1_layout
+          |--plot2_layout
+        """
+        # Set window icon
+        self.setWindowIcon(QIcon('1.ico'))
+   
+        # 全局设置所有样式
+        self.setStyleSheet("""
+            QMainWindow {
+                background-color: #f5faff;   /* 设置主窗口背景为深灰色 */
+            }
+            QPushButton {
+                border-radius: 5px;              
+                background-color: #ADD8E6;       /* 淡蓝色背景 */
+                border: 1px solid #ADD8E6;       /* 边框颜色 */
+                font-family: 'Microsoft YaHei UI';   
+                font-size: 10pt;
+                font: blod;
+                padding: 2px 10px;
+            }
+
+            QPushButton:hover {
+                background-color: #6bb7e0;       /* 悬停时稍深的蓝色 */
+                border: 1px solid #6bb7e0;       /* 悬停时的边框颜色 */
+            }
+
+            QPushButton:pressed {
+                background-color: #5a9acb;       /* 点击时更深的蓝色 */
+                border: 2px solid #5a9acb;       /* 点击时的边框颜色 */
+            }
+                           
+            QLabel {
+                font-family: 'Microsoft YaHei UI';   /* 字体类型 */
+                font-size: 12pt;           /* 字体大小 */
+                font: blod;
+                color: #333333;            /* 字体颜色 */
+            }
+                    
+            QLineEdit {
+                border-radius: 5px;                      /* 圆角 */
+                border: 1px solid #d6e8ff;              /* 边框颜色和宽度 */
+                padding: 5px;                           /* 内边距 */
+                background-color: #d6e8ff;              /* 背景色（淡蓝色） */
+                font-family: 'Microsoft YaHei UI';                /* 字体 */
+                font-size: 10pt;                        /* 字体大小 */
+            }
+
+            QLineEdit:hover {
+                border: 1px solid #bcd9ff;              /* 鼠标悬停时的边框颜色 */
+                background-color: #bcd9ff;              /* 鼠标悬停时的背景色（稍深的蓝色） */
+            }
+
+            QLineEdit:focus {
+                border: 1px solid #a6ccff;              /* 获取焦点时的边框颜色 */
+                background-color: #a6ccff;              /* 获取焦点时的背景色 */
+            }
+                           
+            
+            QTextEdit {
+                background-color: #ffffff;  /* 白色背景 */
+                border: 1px solid #a0aec1;  /* 边框颜色 */
+                border-radius: 5px;         /* 圆角边框 */
+                font-family: 'Microsoft YaHei UI';    /* 字体类型 */
+                font-size: 10pt;            /* 字体大小 */
+            }
+            QListWidget {
+                background-color: #ffffff;        /* 背景色 */
+                border: 1px solid #4682b4;         /* 蓝色边框 */
+                border-radius: 15px;             /* 圆角半径 */
+                padding: 5px;                    /* 内边距 */
+                font-family: 'Microsoft YaHei UI';                /* 字体 */
+                font-size: 10pt;                        /* 字体大小 */
+            }  
+        """)
+
+        main_layout = QVBoxLayout()
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.setSpacing(0)
+
+        # DATABASE & SEARCH AREA
+        search_layout = QHBoxLayout()
+        search_widget = QWidget()
+        search_widget.setLayout(search_layout)
+
+        # Database selection
+        database_layout = QHBoxLayout()
+        database_widget = QWidget()
+        database_widget.setLayout(database_layout)
+        self.database_label = QLabel("数据库：未选择", self)
+        self.load_database_button = QPushButton('加载数据库', self)
+        self.load_database_button.clicked.connect(self.load_database_file)
+
+        self.apply_shadow_effect(self.load_database_button)
+
+        database_layout.addWidget(self.database_label)
+        database_layout.addWidget(self.load_database_button)
+        search_layout.addWidget(database_widget)
+        
+        # Peaks entry 
+        peaks_layout = QHBoxLayout()
+        peaks_widget = QWidget()
+        peaks_widget.setLayout(peaks_layout)
+        self.label_peaks = QLabel("峰值（逗号分隔）：", self)
+        self.textbox_peaks = QLineEdit(self)
+        peaks_layout.addWidget(self.label_peaks)
+        peaks_layout.addWidget(self.textbox_peaks)
+        search_layout.addWidget(peaks_widget)
+
+        # Tolerance Entry
+        tolerance_layout = QHBoxLayout()
+        tolerance_widget = QWidget()
+        tolerance_widget.setLayout(tolerance_layout)
+        self.label_tolerance = QLabel("容差：", self)
+        self.textbox_tolerance = QLineEdit(self)
+        tolerance_layout.addWidget(self.label_tolerance)
+        tolerance_layout.addWidget(self.textbox_tolerance)
+        search_layout.addWidget(tolerance_widget)
+
+        # Search Button
+        self.button_search = QPushButton('搜索', self)
+        self.button_search.clicked.connect(self.on_search)
+        search_layout.addWidget(self.button_search)
+        
+
+        self.apply_shadow_effect(self.button_search)
+        main_layout.addWidget(search_widget)
+
+        # RESULTS AREA
+        results_layout = QHBoxLayout()
+        results_widget = QWidget()
+        results_widget.setLayout(results_layout)
+        self.result_single = QTextEdit(self)
+        self.result_double = QTextEdit(self)
+        self.result_triple = QTextEdit(self)
+        
+        # Set QTextEdit widgets to be read-only and disable text selection
+      
+        for text_edit in [self.result_single, self.result_double, self.result_triple]:
+            text_edit.setReadOnly(True)
+
+            
+              
+        results_layout.addWidget(self.result_single)
+        results_layout.addWidget(self.result_double)
+        results_layout.addWidget(self.result_triple)
+        main_layout.addWidget(results_widget)
+
+        # ADD A THIN LINE HERE
+
+        # LOADED SPECTRUM GRAPH AND UTILITIES
+        plot1_layout = QGridLayout()
+        plot1_layout.setVerticalSpacing(0)
+        plot1_widget = QWidget()
+        plot1_widget.setLayout(plot1_layout)
+        plot1_layout.setColumnStretch(0, 1) # TODO align more precisely
+        plot1_buttons_layout = QVBoxLayout()
+        plot1_buttons_layout.setSpacing(0)
+        plot1_buttons_widget = QWidget()
+        plot1_buttons_widget.setLayout(plot1_buttons_layout)
+        plot1_layout.addWidget(plot1_buttons_widget, 0, 2, 1, 1)
+        main_layout.addWidget(plot1_widget)
+        
+        # PlotWidget: Plot 1
+        #self.plot1 = pg.PlotWidget(self)
+        self.plot1 = CroppablePlotWidget(self)
+        self.plot1.setLabel('left', '强度')
+        self.plot1.setLabel('bottom', '拉曼位移', units='cm<sup>-1</sup>')
+        plot1_layout.addWidget(self.plot1, 0, 0, 1, 2)
+
+        # Button: Find peaks
+        plot1_row1_buttons_layout = QHBoxLayout()
+        plot1_row1_buttons_widget = QWidget()
+        plot1_row1_buttons_widget.setLayout(plot1_row1_buttons_layout)
+        plot1_buttons_layout.addWidget(plot1_row1_buttons_widget)
+        # Button: load spectrum
+        self.button_load_file = QPushButton('加载文件', self)
+        self.button_load_file.clicked.connect(self.load_unknown_spectrum)
+        # 将按钮添加到水平布局中
+        self.apply_shadow_effect(self.button_load_file)
+        plot1_row1_buttons_layout.addWidget(self.button_load_file)
+
+        # Button: estimate / correct baseline
+        self.button_baseline = QPushButton('基线估计', self)
+        self.button_baseline.clicked.connect(self.baseline_callback)
+
+        self.apply_shadow_effect(self.button_baseline)
+        plot1_row1_buttons_layout.addWidget(self.button_baseline)
+
+        plot1_row2_buttons_layout = QHBoxLayout()
+        plot1_row2_buttons_widget = QWidget()
+        plot1_row2_buttons_widget.setLayout(plot1_row2_buttons_layout)
+        plot1_buttons_layout.addWidget(plot1_row2_buttons_widget)
+        # Button: discretize baseline
+        self.button_discretize = QPushButton('基线离散化', self)
+        self.button_discretize.clicked.connect(self.discretize_baseline)
+
+        self.apply_shadow_effect(self.button_discretize)
+        plot1_row2_buttons_layout.addWidget(self.button_discretize)
+
+        # Button: crop
+        self.crop_button = QPushButton("裁剪", self)
+        self.crop_button.clicked.connect(self.toggle_crop_mode)
+
+        self.apply_shadow_effect(self.crop_button)
+        plot1_row2_buttons_layout.addWidget(self.crop_button)
+
+        # Button: Find peaks
+        plot1_peaks_buttons_layout = QHBoxLayout()
+        plot1_peaks_buttons_widget = QWidget()
+        plot1_peaks_buttons_widget.setLayout(plot1_peaks_buttons_layout)
+        plot1_buttons_layout.addWidget(plot1_peaks_buttons_widget)
+
+        self.button_find_peaks = QPushButton('寻找峰值', self)
+        self.button_find_peaks.clicked.connect(self.find_peaks)
+
+
+        self.apply_shadow_effect(self.button_find_peaks)
+        #plot1_buttons_layout.addWidget(self.button_find_peaks)
+        plot1_peaks_buttons_layout.addWidget(self.button_find_peaks)
+
+        # Button: Show peak positions
+        self.button_show_peak_labels = QPushButton('显示标签', self)
+        self.button_show_peak_labels.clicked.connect(self.toggle_labels_callback)
+
+        self.apply_shadow_effect(self.button_show_peak_labels)
+        plot1_peaks_buttons_layout.addWidget(self.button_show_peak_labels)
+
+        plot1_row3_buttons_layout = QHBoxLayout()
+        plot1_row3_buttons_widget = QWidget()
+        plot1_row3_buttons_widget.setLayout(plot1_row3_buttons_layout)
+        plot1_buttons_layout.addWidget(plot1_row3_buttons_widget)
+        # Button: save spectrum
+        self.button_save_spectrum = QPushButton('保存光谱', self)
+        self.button_save_spectrum.clicked.connect(self.save_edited_spectrum)
+
+        self.apply_shadow_effect(self.button_save_spectrum)
+        plot1_row3_buttons_layout.addWidget(self.button_save_spectrum)
+
+        # Button: Reset all
+        self.button_reset = QPushButton('重置', self)
+        self.button_reset.clicked.connect(self.reset)
+
+        self.apply_shadow_effect(self.button_reset)
+        plot1_row3_buttons_layout.addWidget(self.button_reset)
+
+        # LineEdits: scipy.signal.find_peaks() parameters
+        plot1_peak_params_layout = QGridLayout()
+        plot1_peak_params_widget = QWidget()
+        plot1_peak_params_widget.setLayout(plot1_peak_params_layout)
+        plot1_buttons_layout.addWidget(plot1_peak_params_widget)
+
+        # LineEdit: width
+        self.textbox_width = QLineEdit(self)
+        self.textbox_width.setPlaceholderText(' 宽度')
+        plot1_peak_params_layout.addWidget(self.textbox_width, 0, 0)
+
+        # LineEdit: rel_height
+        self.textbox_rel_height = QLineEdit(self)
+        self.textbox_rel_height.setPlaceholderText(' 相对高度')
+        plot1_peak_params_layout.addWidget(self.textbox_rel_height, 0, 1)
+
+        # LineEdit: height
+        self.textbox_height = QLineEdit(self)
+        self.textbox_height.setPlaceholderText(' 高度')
+        plot1_peak_params_layout.addWidget(self.textbox_height, 1, 0)
+
+        # LineEdit: prominence
+        self.textbox_prominence = QLineEdit(self)
+        self.textbox_prominence.setPlaceholderText(' 显著性')
+        plot1_peak_params_layout.addWidget(self.textbox_prominence, 1, 1)
+
+        # LisWidget: Log for Plot 1
+        self.plot1_log = QListWidget()
+        plot1_buttons_layout.addWidget(self.plot1_log)
+
+        # ADD A THIN LINE
+
+        # DATABASE SPECTRA GRAPH AND UTILITIES
+        plot2_layout = QGridLayout()
+        plot2_widget = QWidget()
+        plot2_widget.setLayout(plot2_layout)
+        plot2_layout.setColumnStretch(0, 1)
+        main_layout.addWidget(plot2_widget)
+        plot2_buttons_layout = QVBoxLayout()
+        plot2_buttons_widget = QWidget()
+        plot2_buttons_widget.setLayout(plot2_buttons_layout)
+        plot2_layout.addWidget(plot2_buttons_widget, 0, 2, 1, 1)
+
+        # PlotWidget: Plot 2
+        self.plot2 = CroppablePlotWidget(self)
+        self.plot2.setLabel('left', '强度')
+        self.plot2.setLabel('bottom', '拉曼位移', units='cm<sup>-1</sup>')
+        plot2_layout.addWidget(self.plot2, 0, 0, 1, 2)
+        
+        # LineEdit: mineral name
+        # TODO add auto-fill from database here
+        self.mineral_input = QLineEdit(self)
+        self.mineral_input.setPlaceholderText(" 输入矿物名称")
+        plot2_buttons_layout.addWidget(self.mineral_input)
+
+        # LineEdit: wavelength
+        self.wavelength_input = QLineEdit(self)
+        self.wavelength_input.setPlaceholderText(" 输入波长")
+        plot2_buttons_layout.addWidget(self.wavelength_input)
+
+        # Button: search database
+        self.search_button = QPushButton('搜索', self)
+        self.search_button.clicked.connect(self.search_database)
+    
+        self.apply_shadow_effect(self.search_button)
+        plot2_buttons_layout.addWidget(self.search_button)
+
+        # Button: plot selected spectra
+        self.plot_button = QPushButton('绘制光谱', self)
+        self.plot_button.clicked.connect(self.plot_selected_spectra)
+       
+
+        self.apply_shadow_effect(self.plot_button)
+        plot2_buttons_layout.addWidget(self.plot_button)
+
+        # Button: Align axes with above graph
+        self.align_button = QPushButton('对齐X轴', self)
+        self.align_button.clicked.connect(self.match_range)
+       
+        self.apply_shadow_effect(self.align_button)
+        plot2_buttons_layout.addWidget(self.align_button)
+
+        # ListWidget: results from searching database
+        self.results_list = QListWidget(self)
+        self.results_list.setSelectionMode(QListView.SelectionMode.ExtendedSelection)
+        plot2_buttons_layout.addWidget(self.results_list)
+        
+        # Setting central widget and layout
+        self.setWindowTitle(self.title)
+        self.main_widget = QWidget(self)
+        self.setCentralWidget(self.main_widget)
+        self.main_widget.setLayout(main_layout)
+        self.show()
+
+    def apply_shadow_effect(self,widget):
+        
+        shadow_effect = QGraphicsDropShadowEffect()
+        shadow_effect.setBlurRadius(10)  # 模糊半径
+        shadow_effect.setXOffset(3)      # X轴偏移
+        shadow_effect.setYOffset(3)      # Y轴偏移
+        shadow_effect.setColor(QColor(63, 63, 63, 180))  # 阴影颜色
+        widget.setGraphicsEffect(shadow_effect)
+
+    def reset(self):
+        # 清除加载的数据库、光谱等数据
+        self.database_path = None
+        self.baseline_data = None
+        self.baseline_plot = None
+        self.loaded_spectrum = None
+        self.spectrum = None
+        self.cropping = False
+        self.crop_region = None
+
+     
+        # 清空 peaks_x 和 peaks_y
+        self.peaks_x = np.array([])  
+        self.peaks_y = np.array([])  
+        self.peak_texts.clear()
+
+
+        # 重置UI组件到初始状态
+        self.database_label.setText("数据库：未选择")
+        self.textbox_peaks.clear()
+        self.textbox_tolerance.clear()
+        
+        # 清空搜索结果区域
+        self.result_single.clear()
+        self.result_double.clear()
+        self.result_triple.clear()
+        
+        # 清除图形绘制区域
+        self.plot1.clear()
+        self.plot2.clear()
+        
+        # 清除峰值查找参数输入框
+        self.textbox_width.clear()
+        self.textbox_rel_height.clear()
+        self.textbox_height.clear()
+        self.textbox_prominence.clear()
+        
+        # 重置按钮模式
+        self.crop_button.setText("裁剪")
+        self.button_show_peak_labels.setText('显示标签')
+        self.align_button.setText('对齐X轴')
+        self.button_baseline.setText('基线估计')
+        
+        # 清空Plot 1日志记录
+        self.plot1_log.clear()
+
+        # 清空数据库搜索部分的输入框和列表
+        self.mineral_input.clear()
+        self.wavelength_input.clear()
+        self.results_list.clear()
+        
 
     def resizeEvent(self, event):
         """Ensure both plot widgets have the same width and height during resize"""
@@ -136,395 +548,6 @@ class MainApp(QMainWindow):
     def redo(self):
         print('Redo activated')
         self.command_history.redo()
-
-    def init_UI(self):
-        """Initialization method for the User Interface
-        main_layout
-          |--search_layout
-          |    |--database_layout
-          |    |--peaks_layout
-          |    |--tolerance_layout
-          |--results_layout
-          |--plot1_layout
-          |--plot2_layout
-        """
-        # Set window icon
-        self.setWindowIcon(QIcon('1.ico'))
-   
-        # 全局设置所有样式
-        self.setStyleSheet("""
-            QPushButton {
-                border-radius: 5px;              
-                background-color: #ADD8E6;       /* 淡蓝色背景 */
-                border: 1px solid #B0C4DE;       /* 边框颜色 */
-                font-family: 'Segoe UI';   
-                font-size: 12pt;
-            }
-
-            QPushButton:hover {
-                background-color: #87CEEB;       /* 悬停时稍深的蓝色 */
-                border: 1px solid #A2B5CD;       /* 悬停时的边框颜色 */
-            }
-
-            QPushButton:pressed {
-                background-color: #4682B4;       /* 点击时更深的蓝色 */
-                border: 2px solid #4682B4;       /* 点击时的边框颜色 */
-            }
-                           
-            QLabel {
-                font-family: 'Segoe UI';   /* 字体类型 */
-                font-size: 12pt;           /* 字体大小 */
-                color: #333333;            /* 字体颜色 */
-            }
-                    
-            QLineEdit {
-                border-radius: 5px;                      /* 圆角 */
-                border: 1px solid #b0b0b0;              /* 边框颜色和宽度 */
-                padding: 5px;                           /* 内边距 */
-                background-color: #f0f8ff;              /* 背景色（淡蓝色） */
-                font-family: 'Segoe UI';                /* 字体 */
-                font-size: 12pt;                        /* 字体大小 */
-            }
-
-            QLineEdit:hover {
-                border: 1px solid #808080;              /* 鼠标悬停时的边框颜色 */
-                background-color: #e6f2ff;              /* 鼠标悬停时的背景色（稍深的蓝色） */
-            }
-
-            QLineEdit:focus {
-                border: 1px solid #4682b4;              /* 获取焦点时的边框颜色 */
-                background-color: #d9ecff;              /* 获取焦点时的背景色 */
-            }
-                           
-            
-            QTextEdit {
-                background-color: #ffffff;  /* 白色背景 */
-                border: 1px solid #b0b0b0;  /* 边框颜色 */
-                border-radius: 5px;         /* 圆角边框 */
-                font-family: 'Segoe UI';    /* 字体类型 */
-                font-size: 12pt;            /* 字体大小 */
-            }
-
-         
-            QTextEdit:hover {
-                border: 1px solid #808080;
-                background-color: #e6f0ff;  /* 悬停时稍深的蓝色背景 */
-            }
-            QTextEdit:focus {
-                border: 1px solid #4682b4;              /* 获取焦点时的边框颜色 */
-                background-color: #d9ecff;              /* 获取焦点时的背景色 */
-            }
-        """)
-
-        main_layout = QVBoxLayout()
-        main_layout.setContentsMargins(0, 0, 0, 0)
-        main_layout.setSpacing(0)
-
-        # DATABASE & SEARCH AREA
-        search_layout = QHBoxLayout()
-        search_widget = QWidget()
-        search_widget.setLayout(search_layout)
-
-        # Database selection
-        database_layout = QHBoxLayout()
-        database_widget = QWidget()
-        database_widget.setLayout(database_layout)
-        self.database_label = QLabel("数据库：未选择", self)
-        self.load_database_button = QPushButton('加载数据库', self)
-        self.load_database_button.clicked.connect(self.load_database_file)
-        # Add shadow effect
-        shadow_effect = QGraphicsDropShadowEffect(self.load_database_button)
-        shadow_effect.setBlurRadius(10)  # 模糊半径，越大阴影越柔和
-        shadow_effect.setXOffset(3)  # X轴偏移
-        shadow_effect.setYOffset(3)  # Y轴偏移
-        shadow_effect.setColor(QColor(63, 63, 63, 180))  # 阴影颜色，灰色带一点透明度
-
-        self.load_database_button.setGraphicsEffect(shadow_effect)
-        database_layout.addWidget(self.database_label)
-        database_layout.addWidget(self.load_database_button)
-        search_layout.addWidget(database_widget)
-        
-        # Peaks entry 
-        peaks_layout = QHBoxLayout()
-        peaks_widget = QWidget()
-        peaks_widget.setLayout(peaks_layout)
-        self.label_peaks = QLabel("峰值（逗号分隔）：", self)
-        self.textbox_peaks = QLineEdit(self)
-        peaks_layout.addWidget(self.label_peaks)
-        peaks_layout.addWidget(self.textbox_peaks)
-        search_layout.addWidget(peaks_widget)
-
-        # Tolerance Entry
-        tolerance_layout = QHBoxLayout()
-        tolerance_widget = QWidget()
-        tolerance_widget.setLayout(tolerance_layout)
-        self.label_tolerance = QLabel("容差：", self)
-        self.textbox_tolerance = QLineEdit(self)
-        tolerance_layout.addWidget(self.label_tolerance)
-        tolerance_layout.addWidget(self.textbox_tolerance)
-        search_layout.addWidget(tolerance_widget)
-
-        # Search Button
-        self.button_search = QPushButton('搜索', self)
-        self.button_search.clicked.connect(self.on_search)
-        search_layout.addWidget(self.button_search)
-        # Add shadow effect
-        shadow_effect = QGraphicsDropShadowEffect(self.button_search)
-        shadow_effect.setBlurRadius(10)  # 模糊半径，越大阴影越柔和
-        shadow_effect.setXOffset(3)  # X轴偏移
-        shadow_effect.setYOffset(3)  # Y轴偏移
-        shadow_effect.setColor(QColor(63, 63, 63, 180))  # 阴影颜色，灰色带一点透明度
-
-        self.button_search.setGraphicsEffect(shadow_effect)
-        main_layout.addWidget(search_widget)
-
-        # RESULTS AREA
-        results_layout = QHBoxLayout()
-        results_widget = QWidget()
-        results_widget.setLayout(results_layout)
-        self.result_single = QTextEdit(self)
-        self.result_double = QTextEdit(self)
-        self.result_triple = QTextEdit(self)
-        
-        # Set QTextEdit widgets to be read-only and disable text selection
-        ''''
-        for text_edit in [self.result_single, self.result_double, self.result_triple]:
-            text_edit.setReadOnly(True)
-        '''
-            
-              
-        results_layout.addWidget(self.result_single)
-        results_layout.addWidget(self.result_double)
-        results_layout.addWidget(self.result_triple)
-        main_layout.addWidget(results_widget)
-
-        # ADD A THIN LINE HERE
-
-        # LOADED SPECTRUM GRAPH AND UTILITIES
-        plot1_layout = QGridLayout()
-        plot1_widget = QWidget()
-        plot1_widget.setLayout(plot1_layout)
-        plot1_layout.setColumnStretch(0, 1) # TODO align more precisely
-        plot1_buttons_layout = QVBoxLayout()
-        plot1_buttons_widget = QWidget()
-        plot1_buttons_widget.setLayout(plot1_buttons_layout)
-        plot1_layout.addWidget(plot1_buttons_widget, 0, 2, 1, 1)
-        main_layout.addWidget(plot1_widget)
-        
-        # PlotWidget: Plot 1
-        #self.plot1 = pg.PlotWidget(self)
-        self.plot1 = CroppablePlotWidget(self)
-        self.plot1.setLabel('left', '强度')
-        self.plot1.setLabel('bottom', '拉曼位移', units='cm<sup>-1</sup>')
-        plot1_layout.addWidget(self.plot1, 0, 0, 1, 2)
-
-        # Button: load spectrum
-        self.button_load_file = QPushButton('加载文件', self)
-        self.button_load_file.clicked.connect(self.load_unknown_spectrum)
-        # Add shadow effect
-        shadow_effect = QGraphicsDropShadowEffect(self.button_load_file)
-        shadow_effect.setBlurRadius(10)  # 模糊半径，越大阴影越柔和
-        shadow_effect.setXOffset(3)  # X轴偏移
-        shadow_effect.setYOffset(3)  # Y轴偏移
-        shadow_effect.setColor(QColor(63, 63, 63, 180))  # 阴影颜色，灰色带一点透明度
-
-        self.button_load_file.setGraphicsEffect(shadow_effect)
-        plot1_buttons_layout.addWidget(self.button_load_file)
-
-        # Button: estimate / correct baseline
-        self.button_baseline = QPushButton('基线估计', self)
-        self.button_baseline.clicked.connect(self.baseline_callback)
-        # Add shadow effect
-        shadow_effect = QGraphicsDropShadowEffect(self.button_baseline)
-        shadow_effect.setBlurRadius(10)  # 模糊半径，越大阴影越柔和
-        shadow_effect.setXOffset(3)  # X轴偏移
-        shadow_effect.setYOffset(3)  # Y轴偏移
-        shadow_effect.setColor(QColor(63, 63, 63, 180))  # 阴影颜色，灰色带一点透明度
-
-        self.button_baseline.setGraphicsEffect(shadow_effect)
-        plot1_buttons_layout.addWidget(self.button_baseline)
-
-        # Button: discretize baseline
-        self.button_discretize = QPushButton('基线离散化', self)
-        self.button_discretize.clicked.connect(self.discretize_baseline)
-        # Add shadow effect
-        shadow_effect = QGraphicsDropShadowEffect(self.button_discretize)
-        shadow_effect.setBlurRadius(10)  # 模糊半径，越大阴影越柔和
-        shadow_effect.setXOffset(3)  # X轴偏移
-        shadow_effect.setYOffset(3)  # Y轴偏移
-        shadow_effect.setColor(QColor(63, 63, 63, 180))  # 阴影颜色，灰色带一点透明度
-
-        self.button_discretize.setGraphicsEffect(shadow_effect)
-        plot1_buttons_layout.addWidget(self.button_discretize)
-
-        # Button: crop
-        self.crop_button = QPushButton("裁剪", self)
-        self.crop_button.clicked.connect(self.toggle_crop_mode)
-        # Add shadow effect
-        shadow_effect = QGraphicsDropShadowEffect(self.crop_button)
-        shadow_effect.setBlurRadius(10)  # 模糊半径，越大阴影越柔和
-        shadow_effect.setXOffset(3)  # X轴偏移
-        shadow_effect.setYOffset(3)  # Y轴偏移
-        shadow_effect.setColor(QColor(63, 63, 63, 180))  # 阴影颜色，灰色带一点透明度
-
-        self.crop_button.setGraphicsEffect(shadow_effect)
-        plot1_buttons_layout.addWidget(self.crop_button)
-
-        # Button: save spectrum
-        self.button_save_spectrum = QPushButton('保存光谱', self)
-        self.button_save_spectrum.clicked.connect(self.save_edited_spectrum)
-        # Add shadow effect
-        shadow_effect = QGraphicsDropShadowEffect(self.button_save_spectrum)
-        shadow_effect.setBlurRadius(10)  # 模糊半径，越大阴影越柔和
-        shadow_effect.setXOffset(3)  # X轴偏移
-        shadow_effect.setYOffset(3)  # Y轴偏移
-        shadow_effect.setColor(QColor(63, 63, 63, 180))  # 阴影颜色，灰色带一点透明度
-
-        self.button_save_spectrum.setGraphicsEffect(shadow_effect)
-        plot1_buttons_layout.addWidget(self.button_save_spectrum)
-
-        # LineEdits: scipy.signal.find_peaks() parameters
-        plot1_peak_params_layout = QGridLayout()
-        plot1_peak_params_widget = QWidget()
-        plot1_peak_params_widget.setLayout(plot1_peak_params_layout)
-        plot1_buttons_layout.addWidget(plot1_peak_params_widget)
-
-        # LineEdit: width
-        self.textbox_width = QLineEdit(self)
-        self.textbox_width.setPlaceholderText('宽度')
-        plot1_peak_params_layout.addWidget(self.textbox_width, 0, 0)
-
-        # LineEdit: rel_height
-        self.textbox_rel_height = QLineEdit(self)
-        self.textbox_rel_height.setPlaceholderText('相对高度')
-        plot1_peak_params_layout.addWidget(self.textbox_rel_height, 0, 1)
-
-        # LineEdit: height
-        self.textbox_height = QLineEdit(self)
-        self.textbox_height.setPlaceholderText('高度')
-        plot1_peak_params_layout.addWidget(self.textbox_height, 1, 0)
-
-        # LineEdit: prominence
-        self.textbox_prominence = QLineEdit(self)
-        self.textbox_prominence.setPlaceholderText('显著性')
-        plot1_peak_params_layout.addWidget(self.textbox_prominence, 1, 1)
-
-        # Button: Find peaks
-        plot1_peaks_buttons_layout = QHBoxLayout()
-        plot1_peaks_buttons_widget = QWidget()
-        plot1_peaks_buttons_widget.setLayout(plot1_peaks_buttons_layout)
-        plot1_buttons_layout.addWidget(plot1_peaks_buttons_widget)
-
-        self.button_find_peaks = QPushButton('寻找峰值', self)
-        self.button_find_peaks.clicked.connect(self.find_peaks)
-        # Add shadow effect
-        shadow_effect = QGraphicsDropShadowEffect(self.button_find_peaks)
-        shadow_effect.setBlurRadius(10)  # 模糊半径，越大阴影越柔和
-        shadow_effect.setXOffset(3)  # X轴偏移
-        shadow_effect.setYOffset(3)  # Y轴偏移
-        shadow_effect.setColor(QColor(63, 63, 63, 180))  # 阴影颜色，灰色带一点透明度
-
-        self.button_find_peaks.setGraphicsEffect(shadow_effect)
-        #plot1_buttons_layout.addWidget(self.button_find_peaks)
-        plot1_peaks_buttons_layout.addWidget(self.button_find_peaks)
-
-        # Button: Show peak positions
-        self.button_show_peak_labels = QPushButton('显示标签', self)
-        self.button_show_peak_labels.clicked.connect(self.toggle_labels_callback)
-        # Add shadow effect
-        shadow_effect = QGraphicsDropShadowEffect(self.button_show_peak_labels)
-        shadow_effect.setBlurRadius(10)  # 模糊半径，越大阴影越柔和
-        shadow_effect.setXOffset(3)  # X轴偏移
-        shadow_effect.setYOffset(3)  # Y轴偏移
-        shadow_effect.setColor(QColor(63, 63, 63, 180))  # 阴影颜色，灰色带一点透明度
-
-        self.button_show_peak_labels.setGraphicsEffect(shadow_effect)
-        plot1_peaks_buttons_layout.addWidget(self.button_show_peak_labels)
-
-        # LisWidget: Log for Plot 1
-        self.plot1_log = QListWidget()
-        plot1_buttons_layout.addWidget(self.plot1_log)
-
-        # ADD A THIN LINE
-
-        # DATABASE SPECTRA GRAPH AND UTILITIES
-        plot2_layout = QGridLayout()
-        plot2_widget = QWidget()
-        plot2_widget.setLayout(plot2_layout)
-        plot2_layout.setColumnStretch(0, 1)
-        main_layout.addWidget(plot2_widget)
-        plot2_buttons_layout = QVBoxLayout()
-        plot2_buttons_widget = QWidget()
-        plot2_buttons_widget.setLayout(plot2_buttons_layout)
-        plot2_layout.addWidget(plot2_buttons_widget, 0, 2, 1, 1)
-
-        # PlotWidget: Plot 2
-        self.plot2 = pg.PlotWidget(self)
-        self.plot2.setLabel('left', '强度')
-        self.plot2.setLabel('bottom', '拉曼位移', units='cm<sup>-1</sup>')
-        plot2_layout.addWidget(self.plot2, 0, 0, 1, 2)
-        
-        # LineEdit: mineral name
-        # TODO add auto-fill from database here
-        self.mineral_input = QLineEdit(self)
-        self.mineral_input.setPlaceholderText("输入矿物名称")
-        plot2_buttons_layout.addWidget(self.mineral_input)
-
-        # LineEdit: wavelength
-        self.wavelength_input = QLineEdit(self)
-        self.wavelength_input.setPlaceholderText("输入波长")
-        plot2_buttons_layout.addWidget(self.wavelength_input)
-
-        # Button: search database
-        self.search_button = QPushButton('搜索', self)
-        self.search_button.clicked.connect(self.search_database)
-        # Add shadow effect
-        shadow_effect = QGraphicsDropShadowEffect(self.search_button)
-        shadow_effect.setBlurRadius(10)  # 模糊半径，越大阴影越柔和
-        shadow_effect.setXOffset(3)  # X轴偏移
-        shadow_effect.setYOffset(3)  # Y轴偏移
-        shadow_effect.setColor(QColor(63, 63, 63, 180))  # 阴影颜色，灰色带一点透明度
-
-        self.search_button.setGraphicsEffect(shadow_effect)
-        plot2_buttons_layout.addWidget(self.search_button)
-
-        # Button: plot selected spectra
-        self.plot_button = QPushButton('绘制光谱', self)
-        self.plot_button.clicked.connect(self.plot_selected_spectra)
-        # Add shadow effect
-        shadow_effect = QGraphicsDropShadowEffect(self.plot_button)
-        shadow_effect.setBlurRadius(10)  # 模糊半径，越大阴影越柔和
-        shadow_effect.setXOffset(3)  # X轴偏移
-        shadow_effect.setYOffset(3)  # Y轴偏移
-        shadow_effect.setColor(QColor(63, 63, 63, 180))  # 阴影颜色，灰色带一点透明度
-
-        self.plot_button.setGraphicsEffect(shadow_effect)
-        plot2_buttons_layout.addWidget(self.plot_button)
-
-        # Button: Align axes with above graph
-        self.align_button = QPushButton('对齐X轴', self)
-        self.align_button.clicked.connect(self.match_range)
-        # Add shadow effect
-        shadow_effect = QGraphicsDropShadowEffect(self.align_button)
-        shadow_effect.setBlurRadius(10)  # 模糊半径，越大阴影越柔和
-        shadow_effect.setXOffset(3)  # X轴偏移
-        shadow_effect.setYOffset(3)  # Y轴偏移
-        shadow_effect.setColor(QColor(63, 63, 63, 180))  # 阴影颜色，灰色带一点透明度
-
-        self.align_button.setGraphicsEffect(shadow_effect)
-        plot2_buttons_layout.addWidget(self.align_button)
-
-        # ListWidget: results from searching database
-        self.results_list = QListWidget(self)
-        self.results_list.setSelectionMode(QListView.SelectionMode.ExtendedSelection)
-        plot2_buttons_layout.addWidget(self.results_list)
-        
-        # Setting central widget and layout
-        self.setWindowTitle(self.title)
-        self.main_widget = QWidget(self)
-        self.setCentralWidget(self.main_widget)
-        self.main_widget.setLayout(main_layout)
-        self.show()
 
     def toggle_crop_mode(self):
         if self.cropping:

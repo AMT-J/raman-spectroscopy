@@ -46,6 +46,11 @@ class WhatsNewDialog(QDialog):
                 font-weight: bold;
             }
         """)
+        self.setStyleSheet("""
+            QDialog {
+                background-color: #f5faff;  /* 设置背景颜色为深灰色 */
+            }
+        """)
         self.message_label.setAlignment(Qt.AlignmentFlag.AlignCenter) 
         self.layout.addWidget(self.message_label)
 
@@ -53,18 +58,23 @@ class WhatsNewDialog(QDialog):
         # 定义按钮的基础样式、悬停效果、点击反馈
         button_style = """
             QPushButton {
-                background-color: #f0f0f0;
-                border: 1px solid #ccc;
-                border-radius: 5px;
-                padding: 5px 10px;
+                border-radius: 5px;              
+                background-color: #ADD8E6;       /* 淡蓝色背景 */
+                border: 1px solid #ADD8E6;       /* 边框颜色 */
+                font-family: 'Microsoft YaHei UI';   
+                font-size: 10pt;
+                font: blod;
+                padding: 2px 10px;
             }
 
             QPushButton:hover {
-                background-color: #e0e0e0;
+                background-color: #6bb7e0;       /* 悬停时稍深的蓝色 */
+                border: 1px solid #6bb7e0;       /* 悬停时的边框颜色 */
             }
 
             QPushButton:pressed {
-                background-color: #d0d0d0;
+                background-color: #5a9acb;       /* 点击时更深的蓝色 */
+                border: 2px solid #5a9acb;       /* 点击时的边框颜色 */
             }
         """
         self.prev_button = QPushButton("上一个", self)

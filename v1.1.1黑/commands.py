@@ -7,6 +7,7 @@ GUI's `command_history` list. This structure enables Undo/Redo functionality in 
 
 import numpy as np
 from PyQt6.QtGui import QTextCursor
+import pyqtgraph as pg
 
 class Command:
     """Base class for Commands"""
@@ -89,7 +90,8 @@ class LoadSpectrumCommand(Command):
         self.app.spectrum = self.new_spectrum
         if self.app.spectrum is not None:
             self.app.plot1.clear()
-            self.app.plot1.plot(self.app.spectrum.x, self.app.spectrum.y)
+            pen=pg.mkPen(color='w',width=3)
+            self.app.plot1.plot(self.app.spectrum.x, self.app.spectrum.y,pen=pen)
             self.app.plot1.autoRange()
 
         # Communicate
@@ -153,7 +155,7 @@ class EstimateBaselineCommand(Command):
     def execute(self):
 
         # Aesthetics
-        self.app.button_baseline.setText('应用基线校正校准')
+        self.app.button_baseline.setText('应用基线校准')
         self.app.plot1_log.addItem('基线估计已计算') # Communicate
         # 选中最后一个项目并滚动到该项目
         self.app.plot1_log.setCurrentRow(self.app.plot1_log.count() - 1)
@@ -166,7 +168,8 @@ class EstimateBaselineCommand(Command):
         # Update plot
         if self.app.baseline_plot is not None:
             self.app.plot1.removeItem(self.app.baseline_plot)
-        self.app.baseline_plot = self.app.plot1.plot(self.app.spectrum.x, self.app.baseline_data, pen='r')
+        pen=pg.mkPen(color='r',width=3)
+        self.app.baseline_plot = self.app.plot1.plot(self.app.spectrum.x, self.app.baseline_data, pen=pen)
         
     def undo(self):
         # Aesthetics
@@ -180,7 +183,8 @@ class EstimateBaselineCommand(Command):
             self.app.baseline_data = None
         
         if self.app.baseline_data is not None:
-            self.app.baseline_plot = self.app.plot1.plot(self.app.spectrum.x, self.app.baseline_data, pen='r')
+            pen=pg.mkPen(color='r',width=3)
+            self.app.baseline_plot = self.app.plot1.plot(self.app.spectrum.x, self.app.baseline_data, pen=pen)
         self.app.plot1_log.addItem("基线估计已撤销")
         # 选中最后一个项目并滚动到该项目
         self.app.plot1_log.setCurrentRow(self.app.plot1_log.count() - 1)
@@ -225,7 +229,7 @@ class CorrectBaselineCommand(Command):
 
     def undo(self):
         # Aesthetics
-        self.app.button_baseline.setText('应用基线校正')
+        self.app.button_baseline.setText('应用基线校准')
 
         self.app.spectrum = self.old_spectrum
         self.app.baseline_data = self.old_baseline_data # Resture baseline data from before subtraction
@@ -233,7 +237,8 @@ class CorrectBaselineCommand(Command):
         if self.app.spectrum is not None:
             self.app.plot1.plot(self.app.spectrum.x, self.app.spectrum.y)
         if self.app.baseline_data is not None:
-            self.app.baseline_plot = self.app.plot1.plot(self.app.spectrum.x, self.app.baseline_data, pen='r')
+            pen=pg.mkPen(color='r',width=3)
+            self.app.baseline_plot = self.app.plot1.plot(self.app.spectrum.x, self.app.baseline_data, pen=pen)
         self.app.plot1.autoRange()
 
         # Message
