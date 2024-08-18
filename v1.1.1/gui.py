@@ -43,7 +43,13 @@ class MainApp(QMainWindow):
         self.cropping = False
         self.crop_region = None
 
+        self.msg_singletons = ''
+        self.msg_pairs = ''
+        self.msg_triples = ''
 
+        self.unique_singletons = []
+        self.unique_pairs = []
+        self.unique_triples = []
         with open('config.json', 'r') as f:
             self.config = json.load(f)
         
@@ -426,7 +432,9 @@ class MainApp(QMainWindow):
         self.spectrum = None
         self.cropping = False
         self.crop_region = None
-
+        self.msg_singletons = None
+        self.msg_pairs = None
+        self.msg_triples = None
      
         # 清空 peaks_x 和 peaks_y
         self.peaks_x = np.array([])  
@@ -712,15 +720,17 @@ class MainApp(QMainWindow):
         if self.spectrum == None:
             QMessageBox.critical(self,'错误','请先导入光谱数据！')
             return
+        # 禁用UI组件，防止在搜索进行时操作
+        self.reset_button.setEnabled(False)
+        self.search_button.setEnabled(False)
+        self.button_search.setEnabled(False)
         # 创建一个新的线程来运行搜索操作
-        self.stop_thread_flag = False
         search_thread = threading.Thread(target=self._search_database_thread)
         search_thread.daemon = True  # 设置为守护线程
         search_thread.start()
 
     def _search_database_thread(self):
-        # 禁用UI组件，防止在搜索进行时用户操作
-        self.reset_button.setEnabled(False)
+        
         connection = sqlite3.connect(self.database_path)
         cursor = connection.cursor()
         # 从数据库中获取所有光谱数据
@@ -776,6 +786,8 @@ class MainApp(QMainWindow):
             self.results_list.addItem(f"相似度{similarity:.2f}%：{filename}")
 
         self.reset_button.setEnabled(True)
+        self.search_button.setEnabled(True)
+        self.button_search.setEnabled(True)
         
 
     def plot_selected_spectra(self):
@@ -905,31 +917,53 @@ class MainApp(QMainWindow):
         if not self.textbox_peaks.text().strip() or not self.textbox_tolerance.text().strip():
             QMessageBox.critical(self, '错误', '请先输入峰值和容差！')
             return 
-        # 1.从文本框中获取值
+            
+        self.reset_button.setEnabled(False)
+        self.search_button.setEnabled(False)
+        self.button_search.setEnabled(False)
+        # 创建一个新的线程来运行搜索操作
+        on_search_thread = threading.Thread(target=self._on_search_database_thread)
+        on_search_thread.daemon = True  # 设置为守护线程
+        on_search_thread.start()
+
+    def _on_search_database_thread(self):
+        # 从文本框中获取值
         peaks = self.textbox_peaks.text().split(',')
         peaks = [float(x) for x in peaks]
         tolerance = float(self.textbox_tolerance.text().strip())
-        
-        # 2.调用搜索功能
-        result = find_spectrum_matches(self.database_path, peaks, tolerance) # Dict with keys 1,2,3
-        unqiue_singletons = sorted(get_unique_mineral_combinations_optimized(self.database_path, result[1]))
-        unique_pairs = sorted(get_unique_mineral_combinations_optimized(self.database_path, result[2]))
-        unique_triples = sorted(get_unique_mineral_combinations_optimized(self.database_path, result[3]))
-        msg_singletons = f'Found {len(unqiue_singletons)} unique mineral(s) containing your peak(s):\n'
-        msg_pairs = f'Found {len(unique_pairs)} unique combinations of 2 minerals matching your peak(s):\n'
-        msg_triples = f'Found {len(unique_triples)} unique combinations of 3 minerals matching your peak(s):\n'
-        
-        # 3.用结果填充 QTextEdits：
-        self.result_single.setText(msg_singletons)
-        self.result_double.setText(msg_pairs)
-        self.result_triple.setText(msg_triples)
 
-        for line in unqiue_singletons:
+        # 调用搜索功能
+        result = find_spectrum_matches(self.database_path, peaks, tolerance)  
+        self.unique_singletons = sorted(get_unique_mineral_combinations_optimized(self.database_path, result[1]))
+        self.unique_pairs = sorted(get_unique_mineral_combinations_optimized(self.database_path, result[2]))
+        self.unique_triples = sorted(get_unique_mineral_combinations_optimized(self.database_path, result[3]))
+
+        # 准备要显示的消息
+        self.msg_singletons = f'找到{len(self.unique_singletons)}种含有峰值的矿物：\n'
+        self.msg_pairs = f'找到{len(self.unique_pairs)}与峰值相匹配的2种矿物组合：\n'
+        self.msg_triples = f'找到{len(self.unique_triples)}与峰值相匹配的3种矿物组合：\n'
+
+        # 在主线程中更新UI
+        QTimer.singleShot(0, self.update_ui_after_search)
+
+    def update_ui_after_search(self):
+        # 用结果填充 QTextEdits
+        self.result_single.setText(self.msg_singletons)
+        self.result_double.setText(self.msg_pairs)
+        self.result_triple.setText(self.msg_triples)
+
+        for line in self.unique_singletons:
             self.result_single.append(line[0])
-        for line in unique_pairs:
+        for line in self.unique_pairs:
             self.result_double.append(f'{line[0]},   {line[1]}')
-        for line in unique_triples:
+        for line in self.unique_triples:
             self.result_triple.append(f'{line[0]},   {line[1]},   {line[2]}')
+
+        # 启用UI组件
+        self.reset_button.setEnabled(True)
+        self.search_button.setEnabled(True)
+        self.button_search.setEnabled(True)
+
     def to_end(self):
         # 选中最后一个项目并滚动到该项目
         self.plot1_log.setCurrentRow(self.plot1_log.count() - 1)
