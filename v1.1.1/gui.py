@@ -43,13 +43,6 @@ class MainApp(QMainWindow):
         self.cropping = False
         self.crop_region = None
 
-        self.msg_singletons = ''
-        self.msg_pairs = ''
-        self.msg_triples = ''
-
-        self.unique_singletons = []
-        self.unique_pairs = []
-        self.unique_triples = []
         with open('config.json', 'r') as f:
             self.config = json.load(f)
         
@@ -442,9 +435,6 @@ class MainApp(QMainWindow):
         self.spectrum = None
         self.cropping = False
         self.crop_region = None
-        self.msg_singletons = None
-        self.msg_pairs = None
-        self.msg_triples = None
      
         # 清空 peaks_x 和 peaks_y
         self.peaks_x = np.array([])  
@@ -471,6 +461,8 @@ class MainApp(QMainWindow):
         self.textbox_rel_height.clear()
         self.textbox_height.clear()
         self.textbox_prominence.clear()
+        self.mineral_input.clear()
+        self.wavelength_input.clear()
         
         # 重置按钮模式
         self.crop_button.setText("裁剪")
@@ -746,10 +738,49 @@ class MainApp(QMainWindow):
         self.reset_button.setEnabled(False)
         self.search_button.setEnabled(False)
         self.button_search.setEnabled(False)
-        # 创建一个新的线程来运行搜索操作
-        search_thread = threading.Thread(target=self._search_database_thread)
-        search_thread.daemon = True  # 设置为守护线程
-        search_thread.start()
+
+        self.mineral_name = self.mineral_input.text()
+        self.wavelength = self.wavelength_input.text()
+        if not self.mineral_name or not self.wavelength:
+            QMessageBox.information(self, '提示', '矿物名称或波长未输入，将自动进行相似度匹配！')
+            # 创建一个新的线程来运行搜索操作
+            search_thread = threading.Thread(target=self._search_database_thread)
+            search_thread.daemon = True  # 设置为守护线程
+            search_thread.start()
+        else:
+            QMessageBox.information(self, '提示', '将根据矿物名称和波长进行检索！')
+            _search_thread = threading.Thread(target=self._search_database)
+            _search_thread.daemon = True  # 设置为守护线程
+            _search_thread.start()
+            
+
+    def _search_database(self):
+        connection = sqlite3.connect(self.database_path)
+        cursor = connection.cursor()
+
+        # 将矿物名称转换为小写
+        mineral_name_lower = self.mineral_name.lower()
+
+        if self.wavelength != '':
+            # 在名称列上使用 LOWER 函数，并使用 = 运算符进行比较
+            cursor.execute("SELECT filename, data_x, data_y FROM Spectra WHERE LOWER(names) = ? AND wavelength=?", (mineral_name_lower, self.wavelength))
+        else:
+            cursor.execute("SELECT filename, data_x, data_y FROM Spectra WHERE LOWER(names) = ?", (mineral_name_lower,))
+        results = cursor.fetchall()
+        connection.close() 
+        # 填充结果列表
+        self.results_list.clear()
+        self.data_to_plot = {}
+        if results: 
+            for result in results:
+                self.results_list.addItem(result[0])
+                self.data_to_plot[result[0]] = (result[1], result[2])
+        else:
+            self.results_list.addItem(f"未找到该矿物和波长所对应的光谱数据")
+
+        self.reset_button.setEnabled(True)
+        self.search_button.setEnabled(True)
+        self.button_search.setEnabled(True)
 
     def _search_database_thread(self):
         
