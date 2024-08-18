@@ -66,7 +66,7 @@ class MainApp(QMainWindow):
         # 全局设置所有样式
         self.setStyleSheet("""
             QMainWindow {
-                background-color: #f5faff;   /* 设置主窗口背景为深灰色 */
+                background-color: #f5faff;   /* 设置主窗口背景为淡蓝色 */
             }
             QPushButton {
                 border-radius: 5px;              

@@ -48,7 +48,7 @@ class WhatsNewDialog(QDialog):
         """)
         self.setStyleSheet("""
             QDialog {
-                background-color: #f5faff;  /* 设置背景颜色为深灰色 */
+                background-color: #f5faff;  /* 设置背景颜色为淡蓝色 */
             }
         """)
         self.message_label.setAlignment(Qt.AlignmentFlag.AlignCenter) 
