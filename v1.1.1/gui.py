@@ -88,7 +88,11 @@ class MainApp(QMainWindow):
                 background-color: #5a9acb;       /* 点击时更深的蓝色 */
                 border: 2px solid #5a9acb;       /* 点击时的边框颜色 */
             }
-                           
+            QPushButton:disabled {
+                background-color: lightgray;
+                color: #505050;
+                border: lightgray;
+            }      
             QLabel {
                 font-family: 'Microsoft YaHei UI';   /* 字体类型 */
                 font-size: 12pt;           /* 字体大小 */
@@ -398,7 +402,7 @@ class MainApp(QMainWindow):
     def smooth_spectrum(self):
         """"光谱平滑处理"""
         if self.spectrum is None:
-            QMessageBox.critical(self, '错误', '请先加载光谱数据。')
+            QMessageBox.critical(self, '错误', '请先加载光谱数据！')
             return
 
         command = SmoothSpectrumCommand(self)
@@ -565,16 +569,25 @@ class MainApp(QMainWindow):
             return
         if self.cropping:
             self.crop_region = self.plot1.get_crop_region()
-            self.apply_crop()
-            self.crop_button.setText("裁剪")
+            if self.crop_region is None:
+                QMessageBox.critical(self,'错误',"请先选中裁剪区域！")
+                return
+            
+            crop_start_x, crop_end_x = self.crop_region.getRegion()
+            
+            command = CropCommand(self, crop_start_x, crop_end_x)
+            self.command_history.execute(command)
+            self.crop_button.setText('裁剪')
             self.button_show_peak_labels.setText('显示标签')
             self.button_baseline.setText('基线估计')
             self.button_find_peaks.setText('显示峰值')
             self.cropping = False
             self.plot1.cropping = self.cropping
-            if self.crop_region:
-                self.plot1.removeItem(self.crop_region)
-                self.crop_region = None
+
+            # 从绘图中删除 crop_region 项。
+            self.plot1.removeItem(self.crop_region)
+            self.crop_region = None
+            self.plot1.crop_region = None
         else:
             self.crop_button.setText("应用裁剪")
             self.cropping = True
@@ -586,31 +599,15 @@ class MainApp(QMainWindow):
             return
         default_name = f"{self.unknown_spectrum_path.stem}_processed.txt"
         suggested_path = self.unknown_spectrum_path.parent / default_name
-        fname, _ = QFileDialog.getSaveFileName(self, "Save Spectrum", str(suggested_path), "Text Files (*.txt)")
+        fname, _ = QFileDialog.getSaveFileName(self, "保存光谱", str(suggested_path), "Text Files (*.txt)")
 
         if fname:  # 检查用户是否没有取消对话框
             with open(fname, 'w') as f:
                 for x, y in zip(self.spectrum.x, self.spectrum.y):
                     f.write(f"{x} {y}\n")
             
-            self.plot1_log.addItem(f'保存修改后的光谱到： {fname}')
+            self.plot1_log.addItem(f'已保存修改后的光谱： {fname}')
             self.to_end()
-
-    def apply_crop(self):
-        # 如果没有裁剪区域，则什么也不做
-        if self.crop_region is None:
-            return
-        
-        crop_start_x, crop_end_x = self.crop_region.getRegion()
-        
-        command = CropCommand(self, crop_start_x, crop_end_x)
-        self.command_history.execute(command)
-
-        # 从绘图中删除 crop_region 项。
-        self.plot1.removeItem(self.crop_region)
-        self.crop_region = None
-        self.plot1.crop_region = None
-
 
     def update_discretized_baseline(self):
         """每当用户在离散化后移动一个点时，都会更新已加载频谱的基线数据"""
@@ -669,6 +666,7 @@ class MainApp(QMainWindow):
         else: # 重置
             self.plot2.autoRange()
             self.plot2.setXLink(None)
+            self.plot1.autoRange()
             self.align_button.setText('对齐X轴')
 
     def load_database_file(self):
@@ -721,6 +719,8 @@ class MainApp(QMainWindow):
         search_thread.start()
 
     def _search_database_thread(self):
+        # 禁用UI组件，防止在搜索进行时用户操作
+        self.reset_button.setEnabled(False)
         connection = sqlite3.connect(self.database_path)
         cursor = connection.cursor()
         # 从数据库中获取所有光谱数据
@@ -730,8 +730,10 @@ class MainApp(QMainWindow):
         #初始化
         index = 1
         total = len(results)
-        # 获取未知光谱数据
-        unknown_x, unknown_y = get_xy_from_file(self.unknown_spectrum_path)
+        # 使用当前处理后的光谱数据
+        processed_x = self.spectrum.x
+        processed_y = self.spectrum.y
+        #unknown_x, unknown_y = get_xy_from_file(self.unknown_spectrum_path)
         # 存储相似度计算结果
         similarity_results = []
         # 初始化结果列表
@@ -746,10 +748,10 @@ class MainApp(QMainWindow):
             data_y = np.array(eval(data_y))
             
             # 对x轴插值，确保x轴一致
-            interpolated_y = np.interp(unknown_x, data_x, data_y)
+            interpolated_y = np.interp(processed_x, data_x, data_y)
             
            # 计算相似度
-            similarity = self.similarity(unknown_y, interpolated_y)*100
+            similarity = self.similarity(processed_y, interpolated_y)*100
             
             if similarity >= 1 :  # 只保留相似度大于等于1%的结果
                 similarity_results.append((filename, similarity))
@@ -772,6 +774,8 @@ class MainApp(QMainWindow):
         self.results_list.clear()
         for filename, similarity in similarity_results:
             self.results_list.addItem(f"相似度{similarity:.2f}%：{filename}")
+
+        self.reset_button.setEnabled(True)
         
 
     def plot_selected_spectra(self):
@@ -869,12 +873,12 @@ class MainApp(QMainWindow):
             self.peak_plot = self.plot1.plot(self.peaks_x, self.peaks_y, pen=None, symbol='o', symbolSize=7, symbolBrush=(255, 0, 0))
             # 显示峰值信息到日志和文本框
             if len(self.peaks_x) < 15:
-                self.plot1_log.addItem(f'Peaks: {", ".join([str(x) for x in sorted(self.peaks_x)])}')
+                self.plot1_log.addItem(f'峰值：{", ".join([str(x) for x in sorted(self.peaks_x)])}')
                 self.to_end()
                 self.textbox_peaks.setText(','.join([str(round(x,1)) for x in sorted(self.peaks_x)]))
             else:
                 first_15_peaks = self.peaks_x[:15]
-                self.plot1_log.addItem(f'Peaks: {", ".join([str(x) for x in sorted(first_15_peaks)])}...')
+                self.plot1_log.addItem(f'峰值：{", ".join([str(x) for x in sorted(first_15_peaks)])}...')
                 self.to_end()
                 self.textbox_peaks.setText(','.join([str(round(x,1)) for x in sorted(first_15_peaks)]))
             self.button_find_peaks.setText('隐藏峰值')

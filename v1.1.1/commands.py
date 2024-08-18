@@ -4,7 +4,6 @@
 每个类都有一个 `undo` 和 `execute` 方法。命令存储在 GUI 的 `command_history` 列表中。此结构实现了 GUI 中的撤销/重做功能。
 """
 import numpy as np
-from PyQt6.QtGui import QTextCursor
 import pyqtgraph as pg
 from scipy.signal import savgol_filter
 
@@ -335,10 +334,28 @@ class SmoothSpectrumCommand(Command):
 
     def execute(self):
         """执行光谱平滑处理"""
-        # 使用 Savitzky-Golay 滤波器进行平滑处理
-        window_length = 11  # 滑动窗口长度
-        polyorder = 3       # 多项式阶数
-        smoothed_y = savgol_filter(self.app.spectrum.y, window_length, polyorder)
+        # 处理 NaN 数据
+        valid_indices = ~np.isnan(self.app.spectrum.y)
+        valid_x = self.app.spectrum.x[valid_indices]
+        valid_y = self.app.spectrum.y[valid_indices]
+
+        # 如果有效数据不足以进行平滑处理，则跳过平滑处理
+        if len(valid_y) < 11:
+            # 添加平滑处理信息到日志
+            self.app.plot1_log.addItem('有效数据点不足，无法进行平滑处理')
+            self.app.plot1_log.setCurrentRow(self.app.plot1_log.count() - 1)
+            self.app.plot1_log.scrollToItem(self.app.plot1_log.currentItem())
+            self.app.plot1_log.clearSelection()
+            return
+
+        # 设置平滑窗口和多项式阶数
+        window_length = min(11, len(valid_y))  # 确保窗口长度不超过有效数据的长度
+        polyorder = min(3, window_length - 1)  # 多项式阶数应小于窗口长度
+        
+        smoothed_y = savgol_filter(valid_y, window_length, polyorder)
+        # 用平滑后的数据更新光谱数据
+        smoothed_spectrum = CommandSpectrum(valid_x, smoothed_y)
+        self.app.spectrum = smoothed_spectrum
         self.app.button_baseline.setText('基线估计')
         self.app.button_show_peak_labels.setText('显示标签')
         self.app.button_find_peaks.setText('显示峰值')
