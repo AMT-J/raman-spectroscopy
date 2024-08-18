@@ -918,15 +918,17 @@ class MainApp(QMainWindow):
             QMessageBox.critical(self, '错误', '请先输入峰值和容差！')
             return 
             
-        self.reset_button.setEnabled(False)
-        self.search_button.setEnabled(False)
-        self.button_search.setEnabled(False)
         # 创建一个新的线程来运行搜索操作
         on_search_thread = threading.Thread(target=self._on_search_database_thread)
         on_search_thread.daemon = True  # 设置为守护线程
         on_search_thread.start()
 
     def _on_search_database_thread(self):
+        
+        self.reset_button.setEnabled(False)
+        self.search_button.setEnabled(False)
+        self.button_search.setEnabled(False)
+
         # 从文本框中获取值
         peaks = self.textbox_peaks.text().split(',')
         peaks = [float(x) for x in peaks]
