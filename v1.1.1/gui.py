@@ -357,6 +357,16 @@ class MainApp(QMainWindow):
         self.plot2.setLabel('bottom', '拉曼位移', units='cm<sup>-1</sup>')
         plot2_layout.addWidget(self.plot2, 0, 0, 1, 2)
 
+        #矿物名称
+        self.mineral_input = QLineEdit(self)
+        self.mineral_input.setPlaceholderText(" 输入矿物名称")
+        plot2_buttons_layout.addWidget(self.mineral_input)
+
+        # 波长
+        self.wavelength_input = QLineEdit(self)
+        self.wavelength_input.setPlaceholderText(" 输入波长")
+        plot2_buttons_layout.addWidget(self.wavelength_input)
+
         plot2_row1_buttons_layout = QHBoxLayout()
         plot2_row1_buttons_widget = QWidget()
         plot2_row1_buttons_widget.setLayout(plot2_row1_buttons_layout)
@@ -618,6 +628,7 @@ class MainApp(QMainWindow):
             self.to_end()
 
     def update_discretized_baseline(self):
+
         """每当用户在离散化后移动一个点时，都会更新已加载频谱的基线数据"""
         self.draggableGraph.setData(pos=np.array(list(zip(self.draggableScatter.data['x'], self.draggableScatter.data['y']))))
         self.baseline_data = np.interp(self.spectrum.x, self.draggableScatter.data['x'], self.draggableScatter.data['y'])
@@ -633,19 +644,30 @@ class MainApp(QMainWindow):
         if self.button_baseline.text().strip() == "基线估计":
             QMessageBox.critical(self, '错误', '请先进行基线估计！')
             return
+        
+        # 将 self.spectrum.x 和 baseline_data 排序为升序
+        sorted_indices = np.argsort(self.spectrum.x)
+        sorted_x = self.spectrum.x[sorted_indices]
+        sorted_baseline = self.baseline_data[sorted_indices]
         # 将基线离散化
-        x_vals = np.arange(self.spectrum.x[0], self.spectrum.x[-1], self.config['discrete baseline step size'])
-        y_vals = np.interp(x_vals, self.spectrum.x, self.baseline_data)
-
+        x_vals = np.arange(sorted_x[0], sorted_x[-1], self.config['discrete baseline step size'])
+        y_vals = np.interp(x_vals, self.spectrum.x, sorted_baseline)
+       
         # 如果存在上一条离散化基线，则清除它
         if hasattr(self, 'draggableScatter'):
             self.plot1.removeItem(self.draggableScatter)
         if hasattr(self, 'draggableGraph'):
             self.plot1.removeItem(self.draggableGraph)
 
-        self.draggableScatter = DraggableScatter(x=x_vals, y=y_vals, size=self.config['discrete baseline point size'], symbolBrush=eval(self.config['discrete baseline point color']))
+        self.draggableScatter = DraggableScatter(
+            x=x_vals,
+            y=y_vals, 
+            size=self.config['discrete baseline point size'], 
+            symbolBrush=eval(self.config['discrete baseline point color'])
+        )
         self.draggableScatter.pointDragged.connect(self.update_discretized_baseline)
         self.draggableScatter.dragFinished.connect(self.handle_drag_finished)
+
         self.draggableGraph = DraggableGraph(scatter_data={'x': x_vals, 'y': y_vals})
         
         self.plot1.addItem(self.draggableScatter)
