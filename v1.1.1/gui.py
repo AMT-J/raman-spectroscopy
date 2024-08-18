@@ -777,13 +777,17 @@ class MainApp(QMainWindow):
         time.sleep(0.5)  # 增加延迟，放慢加载速度
         self.results_list.clear()
         self.results_list.addItem(f"已搜索完成！以下是搜索结果：")
-        time.sleep(0.5) 
-        # 按相似度从高到低排序
-        similarity_results.sort(key=lambda x: x[1], reverse=True)
-        # 填充结果列表
-        self.results_list.clear()
-        for filename, similarity in similarity_results:
-            self.results_list.addItem(f"相似度{similarity:.2f}%：{filename}")
+        time.sleep(0.5)
+        if similarity_results: 
+            # 按相似度从高到低排序
+            similarity_results.sort(key=lambda x: x[1], reverse=True)
+            # 填充结果列表
+            self.results_list.clear()
+            for filename, similarity in similarity_results:
+                self.results_list.addItem(f"相似度{similarity:.2f}%：{filename}")
+        
+        else:
+            self.results_list.addItem(f"未找到相似度大于等于1%的光谱数据")
 
         self.reset_button.setEnabled(True)
         self.search_button.setEnabled(True)
@@ -924,7 +928,7 @@ class MainApp(QMainWindow):
         on_search_thread.start()
 
     def _on_search_database_thread(self):
-        
+
         self.reset_button.setEnabled(False)
         self.search_button.setEnabled(False)
         self.button_search.setEnabled(False)
