@@ -1,4 +1,4 @@
-"""Utility functions for raman mineral identification"""
+"""用于拉曼矿物鉴定的实用功能"""
 
 from itertools import combinations
 

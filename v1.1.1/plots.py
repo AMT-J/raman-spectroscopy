@@ -1,4 +1,4 @@
-"""This module contains a subclass of PlotWidget that allows for cropping"""
+"""该模块包含一个 PlotWidget 的子类，可以进行裁剪"""
 
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
                             QLabel, QLineEdit, QPushButton, QTextEdit, QGridLayout,QGraphicsRectItem,
